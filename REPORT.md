@@ -143,7 +143,7 @@ Ridge回帰（StandardScaler適用済み）の係数は以下の通りである�
 
 **【図1：RMSE vs 学習データ数（散布図）】**
 
-![cv_rmse_scatter](images/cv_rmse_scatter.png)
+![cv_rmse_scatter](docs/images/cv_rmse_scatter.png)
 
 **【表5：Fold別RMSEと学習データ数（厳密な制約の影響）】**
 
@@ -225,7 +225,7 @@ Phase2の安定構造（相互作用なし）を維持したまま、追加候�
 
 **【図2：評価区間（500点）における OV の実測値と予測値の時系列】**
 
-![ov_timeseries](images/ov_timeseries.png)
+![ov_timeseries](docs/images/ov_timeseries.png)
 
 *図2：評価区間（末尾500点）の時系列。上段は実測/予測、下段は残差（実測−予測、0ライン＋平均/中央値ライン）。横軸は評価区間のインデックス（0〜499）。*
 
@@ -234,7 +234,7 @@ Phase2の安定構造（相互作用なし）を維持したまま、追加候�
 
 **【図3：Testの予測 vs 実測散布図（y=x線つき）】**
 
-![pred_vs_true](images/pred_vs_true.png)
+![pred_vs_true](docs/images/pred_vs_true.png)
 
 *図3：テスト区間における予測値と実測値の散布図（y=xを併記）*
 
@@ -243,7 +243,7 @@ Phase2の安定構造（相互作用なし）を維持したまま、追加候�
 
 **【図4：残差の時系列】**
 
-![residuals_time](images/residuals_time.png)
+![residuals_time](docs/images/residuals_time.png)
 
 *図4：テスト区間を含む残差の時系列（残差=実測−予測）*
 
