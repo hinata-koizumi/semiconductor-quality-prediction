@@ -1,7 +1,8 @@
-# VM Quality Prediction（OV予測）最終レポート
+# VM Quality Prediction（OV予測）レポート
 
+**※本リポジトリは大学の講義課題（生産管理）における最終成果物です。**
 **提出日：** 2026/01/11
-**※本レポートの数値・図表は `reproduce_final_report.py` により生成された結果を参照している（Baseline-0/1 は `metrics.csv` に同一条件で保存）。**
+**※本レポートの数値・図表は `reproduce_final_report.py` により生成された結果を参照しています。**
 
 ---
 
