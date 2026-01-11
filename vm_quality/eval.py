@@ -36,6 +36,59 @@ def calculate_weights(df_slice: pd.DataFrame, ref_time: pd.Timestamp, k: float) 
     weights = np.exp(k * dt_days)
     return weights.values
 
+def train_and_predict(
+    train_df: pd.DataFrame, 
+    eval_df: pd.DataFrame, 
+    features: List[str], 
+    config: ModelConfig, 
+    ref_time: pd.Timestamp
+) -> Dict:
+    """
+    Common logic for training and evaluation:
+    1. Build Matrix
+    2. Transform Target (Log)
+    3. Calculate Weights
+    4. Fit Model
+    5. Predict & Inverse Transform
+    6. Clip & Calc RMSE
+    """
+    # Features
+    X_tr, col_names = build_matrix(train_df, features, t_mode=config.t_mode, ref_time=ref_time, interactions=config.interactions)
+    X_eval, _ = build_matrix(eval_df, features, t_mode=config.t_mode, ref_time=ref_time, interactions=config.interactions)
+    
+    y_tr = train_df["OV"].values
+    y_true = eval_df["OV"].values
+    
+    if config.log_target:
+        y_tr = np.log1p(y_tr)
+        
+    weights = calculate_weights(train_df, ref_time, config.weight_k)
+    
+    # Train
+    model = build_ridge_pipeline(config.alpha)
+    if weights is not None:
+        model.fit(X_tr, y_tr, ridge__sample_weight=weights)
+    else:
+        model.fit(X_tr, y_tr)
+    
+    pred = model.predict(X_eval)
+    if config.log_target:
+        pred = np.expm1(pred)
+        
+    pred = np.maximum(pred, 0)
+    rmse = np.sqrt(mean_squared_error(y_true, pred))
+    
+    # Extract Coefficients
+    ridge_model = model.named_steps['ridge']
+    coefs = ridge_model.coef_
+    
+    return {
+        "rmse": rmse,
+        "pred": pred,
+        "col_names": col_names,
+        "coefs": coefs
+    }
+
 def run_cv(df: pd.DataFrame, spec: SplitSpec, features: List[str], config: ModelConfig, n_splits: int = 5) -> Dict:
     full_train_candidates = df.iloc[: spec.test_start].copy()
     tscv = TimeSeriesSplit(n_splits=n_splits, test_size=150)
@@ -61,33 +114,8 @@ def run_cv(df: pd.DataFrame, spec: SplitSpec, features: List[str], config: Model
             "val_start": val_start_time
         })
         
-        # Features
-        X_tr, _ = build_matrix(tr_filtered, features, t_mode=config.t_mode, ref_time=val_start_time, interactions=config.interactions)
-        X_val, _ = build_matrix(val_fold, features, t_mode=config.t_mode, ref_time=val_start_time, interactions=config.interactions)
-        
-        y_tr = tr_filtered["OV"].values
-        y_val = val_fold["OV"].values
-        
-        if config.log_target:
-            y_tr = np.log1p(y_tr)
-            
-        weights = calculate_weights(tr_filtered, val_start_time, config.weight_k)
-        
-        # Train
-        model = build_ridge_pipeline(config.alpha)
-        if weights is not None:
-            model.fit(X_tr, y_tr, ridge__sample_weight=weights)
-        else:
-            model.fit(X_tr, y_tr)
-        
-        pred = model.predict(X_val)
-        if config.log_target:
-            pred = np.expm1(pred)
-            
-        pred = np.maximum(pred, 0)
-        
-        rmse = np.sqrt(mean_squared_error(y_val, pred))
-        fold_rmses.append(rmse)
+        res = train_and_predict(tr_filtered, val_fold, features, config, val_start_time)
+        fold_rmses.append(res["rmse"])
         
     return {
         "mean_rmse": np.mean(fold_rmses),
@@ -106,44 +134,16 @@ def run_final_test(df: pd.DataFrame, spec: SplitSpec, features: List[str], confi
     
     guard_info = apply_dataguard(full_train, cutoff_time)
     
-    # Features
-    X_tr, col_names = build_matrix(full_train, features, t_mode=config.t_mode, ref_time=cutoff_time, interactions=config.interactions)
-    y_tr = full_train["OV"].values
-    
-    X_test, _ = build_matrix(final_test, features, t_mode=config.t_mode, ref_time=cutoff_time, interactions=config.interactions)
-    y_test_true = final_test["OV"].values
-
-    if config.log_target:
-        y_tr = np.log1p(y_tr)
-
-    weights = calculate_weights(full_train, cutoff_time, config.weight_k)
-
-    model = build_ridge_pipeline(config.alpha)
-    if weights is not None:
-        model.fit(X_tr, y_tr, ridge__sample_weight=weights)
-    else:
-        model.fit(X_tr, y_tr)
-    
-    pred = model.predict(X_test)
-    if config.log_target:
-        pred = np.expm1(pred)
-
-    pred = np.maximum(pred, 0)
-    rmse = np.sqrt(mean_squared_error(y_test_true, pred))
-    
-    # Extract Coefficients (Standardized)
-    # Pipeline: [scaler, ridge]
-    ridge_model = model.named_steps['ridge']
-    coefs = ridge_model.coef_
+    res = train_and_predict(full_train, final_test, features, config, cutoff_time)
     
     return {
-        "test_rmse": rmse,
-        "predictions": pred,
-        "y_true": y_test_true,
-        "residuals": y_test_true - pred,
+        "test_rmse": res["rmse"],
+        "predictions": res["pred"],
+        "y_true": final_test["OV"].values,
+        "residuals": final_test["OV"].values - res["pred"],
         "guard": guard_info,
         "process_end_times": final_test["process_end_time"].values,
-        "coefficients": dict(zip(col_names, coefs))
+        "coefficients": dict(zip(res["col_names"], res["coefs"]))
     }
 
 def run_ablation(df: pd.DataFrame, spec: SplitSpec, features: List[str], config: ModelConfig) -> pd.DataFrame:
