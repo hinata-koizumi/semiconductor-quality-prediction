@@ -1,0 +1,21 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data
+data/
+*.xlsx
+*.csv
+
+# Artifacts & Output
+artifacts/
+output/
+PJ説明資料/
+
+# System
+.DS_Store
+
+# User Specific
+生産管理_最終レポート.pdf
